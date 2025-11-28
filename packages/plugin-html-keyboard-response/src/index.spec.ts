@@ -177,4 +177,50 @@ describe("html-keyboard-response simulation", () => {
     expect(getData().values()[0].rt).toBeGreaterThan(0);
     expect(typeof getData().values()[0].response).toBe("string");
   });
+
+  test("should respect response_start_time parameter", async () => {
+    const { getHTML, expectFinished, getData } = await startTimeline([
+      {
+        type: htmlKeyboardResponse,
+        stimulus: "this is html",
+        response_start_time: 1000,
+        choices: ["a"],
+      },
+    ]);
+    // insure stimulus is displayed
+    expect(getHTML()).toBe('<div id="jspsych-html-keyboard-response-stimulus">this is html</div>');
+    // await pressKey("a");
+    // response should not be registered before response_start_time
+    expect(getHTML()).toBe('<div id="jspsych-html-keyboard-response-stimulus">this is html</div>');
+    jest.advanceTimersByTime(500);
+    expect(getHTML()).toBe('<div id="jspsych-html-keyboard-response-stimulus">this is html</div>');
+    jest.advanceTimersByTime(600);
+    await pressKey("a");
+
+    const data = getData().values()[0];
+    console.log(data);
+    expect(data.response).toBe("a");
+    expect(data.rt).toBeGreaterThanOrEqual(100);
+
+    await expectFinished();
+  });
+
+  test("should respect response_end_time parameter", async () => {
+    const { getHTML, expectRunning } = await startTimeline([
+      {
+        type: htmlKeyboardResponse,
+        stimulus: "this is html",
+        response_end_time: 1000,
+        choices: ["a"],
+      },
+    ]);
+    // insure stimulus is displayed
+    expect(getHTML()).toBe('<div id="jspsych-html-keyboard-response-stimulus">this is html</div>');
+    jest.advanceTimersByTime(1100);
+    // response should not be registered after response_end_time
+    expect(getHTML()).toBe('<div id="jspsych-html-keyboard-response-stimulus">this is html</div>');
+    await pressKey("a");
+    expect(getHTML()).toBe('<div id="jspsych-html-keyboard-response-stimulus">this is html</div>');
+    await expectRunning();
+  });
 });

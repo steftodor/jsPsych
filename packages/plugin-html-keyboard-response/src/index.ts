@@ -56,6 +56,26 @@ const info = <const>{
       default: null,
     },
     /**
+     * How long the partipipant has to wakt before they can respond in milliseconds. During this time, key responses will be ignored.
+     * If the value of this parameter is null, then the participant can respond immediately.
+     * Using this parameter will cause the response listener to start after the specified time has elapsed.
+     * Which will cause the rt value to be measured from the start of this response period, not from the start of the trial.
+     */
+    response_start_time: {
+      type: ParameterType.INT,
+      default: null,
+    },
+    /**
+     * After how many milliseconds from the trial initally starting should the response period be avalilable to the participant.
+     * After this time has elapsed, the participant will not be able to respond, but the trial will continue until the trial_duration is reached.
+     * If the value of this parameter is null, then the participant can respond until the trial ends.
+     */
+    response_end_time: {
+      type: ParameterType.INT,
+      default: null,
+    },
+
+    /**
      * If true, then the trial will end whenever the participant makes a response (assuming they make their
      * response before the cutoff specified by the trial_duration parameter). If false, then the trial will
      * continue until the value for trial_duration is reached. You can set this parameter to false to force
@@ -115,6 +135,9 @@ class HtmlKeyboardResponsePlugin implements JsPsychPlugin<Info> {
       key: null,
     };
 
+    // variable to store the keyboard listener
+    var keyboardListener;
+
     // function to end trial when it is time
     const end_trial = () => {
       // kill keyboard listeners
@@ -152,13 +175,35 @@ class HtmlKeyboardResponsePlugin implements JsPsychPlugin<Info> {
 
     // start the response listener
     if (trial.choices != "NO_KEYS") {
-      var keyboardListener = this.jsPsych.pluginAPI.getKeyboardResponse({
-        callback_function: after_response,
-        valid_responses: trial.choices,
-        rt_method: "performance",
-        persist: false,
-        allow_held_key: false,
-      });
+      const start_keyboardListener = () => {
+        keyboardListener = this.jsPsych.pluginAPI.getKeyboardResponse({
+          callback_function: after_response,
+          valid_responses: trial.choices,
+          rt_method: "performance",
+          persist: false,
+          allow_held_key: false,
+        });
+      };
+
+      // determin if keyboard listener should be started immediately or after a delay
+      if (trial.response_start_time !== null) {
+        // start keyboard listener after the delay specified in response_start_time
+        this.jsPsych.pluginAPI.setTimeout(() => {
+          start_keyboardListener();
+        }, trial.response_start_time);
+      } else {
+        // start keyboard listener immediately
+        start_keyboardListener();
+      }
+
+      // determin if keyboard listener should be ended early
+      if (trial.response_end_time !== null) {
+        this.jsPsych.pluginAPI.setTimeout(() => {
+          if (typeof keyboardListener !== "undefined") {
+            this.jsPsych.pluginAPI.cancelKeyboardResponse(keyboardListener);
+          }
+        }, trial.response_end_time);
+      }
     }
 
     // hide stimulus if stimulus_duration is set
